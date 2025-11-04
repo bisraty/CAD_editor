@@ -1,73 +1,77 @@
-# React + TypeScript + Vite
+# 🧩 React + Three.js CAD Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A minimal browser-based CAD editor built using **React** and **plain Three.js** (no React-Three-Fiber).  
+Supports 3D primitive creation, 2D sketching + extrusion, entity selection, transformations, and import/export — all inside a single interactive canvas.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Live Demo
 
-## React Compiler
+**Deployed URL:** https://cad-editor-eta.vercel.app/ 
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🧰 Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **React (TypeScript)** — UI and state management  
+- **Three.js** — 3D rendering and geometry operations  
+- **Vite** or **CRA** — development/build environment  
+- **Plain DOM integration** (no react-three-fiber)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 📁 Project Structure
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+src/
+├── three/
+│ ├── SceneManager.ts # Scene, camera, renderer setup
+│ ├── ShapeFactory.ts # Box, Sphere, Cylinder primitives
+│ ├── SketchManager.ts # (optional future extension)
+│ ├── SelectionManager.ts # Raycasting for edge/face/shape selection
+│ ├── TransformManager.ts # Move, rotate, scale via TransformControls
+│ ├── HistoryManager.ts # Undo/Redo system
+│ ├── IOManager.ts # Import/Export scene as JSON
+│ └── utils.ts # Helpers: grid, snapping, etc.
+│
+├── components/
+│ ├── Canvas3D.tsx # Three.js renderer & logic
+│ ├── Toolbar.tsx # Buttons for create, sketch, transform, undo/redo
+│ ├── PropertiesPanel.tsx # Shows info about selected entity
+│ ├── FileMenu.tsx # Import/Export controls
+│ └── Layout.tsx # App layout (toolbar + canvas + side panel)
+│
+├── hooks/
+│ ├── useCADApp.ts # Global app state management (optional)
+│
+├── App.tsx
+└── index.tsx
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🧩 Core Features
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 🔷 1. Primitive Shape Creation
+- Create **Box**, **Sphere**, and **Cylinder** using toolbar buttons.  
+- Each shape has distinct faces and edges (outlined using `EdgesGeometry`).  
+- Click on:
+  - **Face** → highlight and display its **normal vector** and **area**  
+  - **Edge** → highlight and display its **length**  
+  - **Shape body** → select the entire object for transformation
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+
+### 🟩 2. 2D Sketch Mode & Extrusion
+- Enter **Sketch Mode** (choose **Rectangle** or **Circle** tool)  
+- Draw directly on the **XZ plane** (click and drag)  
+- **Snap-to-grid** precision for accurate shapes  
+- Real-time **wireframe preview** while sketching  
+- On mouse release → automatically **extrudes** the 2D sketch into a 3D mesh using `THREE.ExtrudeGeometry`
+
+---
+
+### 🔶 3. Selection & Transformation
+- Click any entity to select (**face**, **edge**, or **shape**)  
+- Transform selected objects using keyboard shortcuts:
+  - **T** → Translate  
+  - **R** → Rotate  
+  - **S** → Scale  
+- The **Transform gizmo** (`TransformControls`) appears on the selected object  
+- The **Properties Panel** displays real-time pos

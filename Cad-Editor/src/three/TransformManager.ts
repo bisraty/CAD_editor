@@ -1,4 +1,3 @@
-// src/three/TransformManager.ts
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -13,7 +12,7 @@ export class TransformManager {
 
     this.transform = new TransformControls(camera, renderer.domElement);
 
-    // 👇 Fix for TS type mismatch
+    // Fix for TS type mismatch
     scene.add(this.transform as unknown as THREE.Object3D);
 
     this.transform.addEventListener("dragging-changed", (event) => {

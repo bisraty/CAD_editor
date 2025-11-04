@@ -60,8 +60,6 @@ export class SelectionManager {
 
     const hit = intersects[0];
     const obj = hit.object;
-console.log("Clicked:", hit.object.name || hit.object.type);
-
     // find parent Group that contains the mesh
     let group: THREE.Object3D | null = obj;
     while (group && !(group instanceof THREE.Group)) {
@@ -84,7 +82,7 @@ console.log("Clicked:", hit.object.name || hit.object.type);
       return;
     }
 
-    // ✅ Face selection
+    // Face selection
     if (hit.face) {
       const pos = mesh.geometry.attributes.position;
       const vA = new THREE.Vector3().fromBufferAttribute(pos, hit.face.a);
@@ -107,7 +105,7 @@ console.log("Clicked:", hit.object.name || hit.object.type);
       return;
     }
 
-    // ✅ Edge selection
+    // Edge selection
     const edgeGeom = new THREE.EdgesGeometry(mesh.geometry);
     const edges = edgeGeom.attributes.position;
     let closest: [THREE.Vector3, THREE.Vector3] | null = null;
@@ -140,7 +138,7 @@ console.log("Clicked:", hit.object.name || hit.object.type);
       return;
     }
 
-    // ✅ Default shape highlight
+    // Default shape highlight
     const box = new THREE.BoxHelper(group, 0x00ff00);
     this.scene.add(box);
     this.highlight = box;

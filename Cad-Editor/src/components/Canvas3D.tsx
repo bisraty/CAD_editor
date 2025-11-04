@@ -79,7 +79,6 @@ const Canvas3D = forwardRef<
     const canvas = renderer.domElement;
 
     const handleClick = (e: MouseEvent) => {
-      console.log("Canvas click detected");
       if (mode === "sketch") return;
 
       const selection = selectionRef.current;

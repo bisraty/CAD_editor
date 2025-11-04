@@ -21,5 +21,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAddShape, onSketchMode }) =>
     <button onClick={() => onAddShape("cylinder")}>Cylinder</button>
     <button onClick={() => onSketchMode("rectangle")}>Rectangle Sketch</button>
     <button onClick={() => onSketchMode("circle")}>Circle Sketch</button>
+
   </div>
 );

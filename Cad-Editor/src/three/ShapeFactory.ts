@@ -9,19 +9,19 @@ export class ShapeFactory {
       case "sphere":
         mesh = new THREE.Mesh(
           new THREE.SphereGeometry(0.5, 16, 16),
-          new THREE.MeshStandardMaterial({ color: 0xff8844, flatShading: true })
+          new THREE.MeshStandardMaterial({ color: 0xff8848, flatShading: true })
         );
         break;
       case "cylinder":
         mesh = new THREE.Mesh(
           new THREE.CylinderGeometry(0.4, 0.4, 1, 16, 1),
-          new THREE.MeshStandardMaterial({ color: 0x44ffaa, flatShading: true })
+          new THREE.MeshStandardMaterial({ color: 0x44ffab, flatShading: true })
         );
         break;
       default:
         mesh = new THREE.Mesh(
           new THREE.BoxGeometry(1, 1, 1),
-          new THREE.MeshStandardMaterial({ color: 0x4477ff, flatShading: true })
+          new THREE.MeshStandardMaterial({ color: 0x4477fb, flatShading: true })
         );
     }
 

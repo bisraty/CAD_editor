@@ -8,22 +8,25 @@ import {
 } from "react";
 import * as THREE from "three";
 import { SceneManager } from "../three/SceneManager";
-import { ShapeFactory,type PrimitiveType } from "../three/ShapeFactory";
+import { ShapeFactory, type PrimitiveType } from "../three/ShapeFactory";
 import { SelectionManager } from "../three/SelectionManager";
 import { TransformManager } from "../three/TransformManager";
 import { addGridHelper, snapToGrid } from "../three/utils";
 import { IOManager } from "../three/IOManager";
+import { HistoryManager } from "../three/HistoryManager"; //  added
 
 export interface Canvas3DRef {
   addShape: (type: PrimitiveType) => void;
   enterSketchMode: (tool?: "rectangle" | "circle") => void;
   exportScene: () => void;
   importScene: (json: string) => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 const Canvas3D = forwardRef<
   Canvas3DRef,
-  { onSelect: (obj: THREE.Object3D | null) => void }
+  { onSelect: (info: import("../three/SelectionManager").SelectionInfo | null) => void }
 >(({ onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"normal" | "sketch">("normal");
@@ -32,6 +35,7 @@ const Canvas3D = forwardRef<
   const managerRef = useRef<SceneManager | null>(null);
   const selectionRef = useRef<SelectionManager | null>(null);
   const transformRef = useRef<TransformManager | null>(null);
+  const historyRef = useRef<HistoryManager | null>(null); //  undo/redo stack
 
   // Sketch Mode state
   const drawing = useRef(false);
@@ -41,67 +45,76 @@ const Canvas3D = forwardRef<
   // Track shape placement index to space them out
   const shapeCounter = useRef(0);
 
-  // ==========================================================
-  // Initialize SceneManager only once
-  // ==========================================================
+  // Initialize SceneManager (only once)
   useEffect(() => {
-    if (!containerRef.current || managerRef.current) return; // ✅ Prevent duplicate init
+    if (!containerRef.current) return;
 
-    const manager = new SceneManager(containerRef.current);
-    managerRef.current = manager;
+    // Create manager once
+    if (!managerRef.current) {
+      const manager = new SceneManager(containerRef.current);
+      managerRef.current = manager;
 
-    addGridHelper(manager.scene);
+      addGridHelper(manager.scene);
 
-    const selection = new SelectionManager(manager.camera, manager.scene);
-    const transform = new TransformManager(
-      manager.camera,
-      manager.renderer,
-      manager.scene
-    );
+      selectionRef.current = new SelectionManager(manager.camera, manager.scene);
+      transformRef.current = new TransformManager(
+        manager.camera,
+        manager.renderer,
+        manager.scene
+      );
+      historyRef.current = new HistoryManager(manager.scene);
+      historyRef.current.snapshot(); // initial base state
 
-    selectionRef.current = selection;
-    transformRef.current = transform;
+      // Main render loop
+      const loop = () => {
+        requestAnimationFrame(loop);
+        transformRef.current?.update();
+        manager.render();
+      };
+      loop();
+    }
+
+    //  Attach click listener to renderer canvas
+    const renderer = managerRef.current!.renderer;
+    const canvas = renderer.domElement;
 
     const handleClick = (e: MouseEvent) => {
+      console.log("Canvas click detected");
       if (mode === "sketch") return;
+
+      const selection = selectionRef.current;
+      const transform = transformRef.current;
+      if (!selection || !transform) return;
+
       selection.pick(e);
-      if (selection.selected) {
-        transform.attach(selection.selected);
-        onSelect(selection.selected);
+
+      const info = selection.info;
+      if (info) {
+        transform.detach();
+        if (info.type === "shape") transform.attach(info.object);
+        onSelect(info);
       } else {
         transform.detach();
         onSelect(null);
       }
     };
 
-    manager.renderer.domElement.addEventListener("click", handleClick);
-
-    const loop = () => {
-      requestAnimationFrame(loop);
-      transform.update();
-      manager.render();
-    };
-    loop();
+    canvas.addEventListener("click", handleClick);
 
     return () => {
-      manager.renderer.domElement.removeEventListener("click", handleClick);
-      if (containerRef.current?.contains(manager.renderer.domElement)) {
-        containerRef.current.removeChild(manager.renderer.domElement);
-      }
+      canvas.removeEventListener("click", handleClick);
     };
-  }, [onSelect, mode]);
+  }, [mode, onSelect]);
 
-  // ==========================================================
   // Public API methods (for Toolbar/FileMenu)
-  // ==========================================================
   useImperativeHandle(ref, () => ({
     addShape: (type: PrimitiveType) => {
       const mgr = managerRef.current;
       if (!mgr) return;
 
       // Grid-based placement logic
-      const spacing = 2.5; // distance between shapes
-      const cols = 5; // number of columns before wrapping
+      const spacing = 2.5;
+      const cols = 5;
       const i = shapeCounter.current++;
 
       const x = (i % cols) * spacing - ((cols - 1) * spacing) / 2;
@@ -111,24 +124,33 @@ const Canvas3D = forwardRef<
       mesh.position.set(x, 0.5, z);
 
       mgr.scene.add(mesh);
+      historyRef.current?.snapshot(); //  record
     },
+
     enterSketchMode: (tool = "rectangle") => {
       setSketchTool(tool);
       setMode((m) => (m === "sketch" ? "normal" : "sketch"));
     },
+
     exportScene: () => {
       const mgr = managerRef.current;
       if (mgr) IOManager.export(mgr.scene);
     },
+
     importScene: (json: string) => {
       const mgr = managerRef.current;
-      if (mgr) IOManager.import(json, mgr.scene);
+      if (mgr) {
+        IOManager.import(json, mgr.scene);
+        historyRef.current?.snapshot();
+      }
     },
+
+    //  Undo/Redo bindings
+    undo: () => historyRef.current?.undo(),
+    redo: () => historyRef.current?.redo(),
   }));
 
-  // ==========================================================
   // Sketch Mode Handlers
-  // ==========================================================
   useEffect(() => {
     const mgr = managerRef.current;
     if (!mgr) return;
@@ -160,6 +182,15 @@ const Canvas3D = forwardRef<
       if (!drawing.current || !startPoint.current || mode !== "sketch") return;
       const current = getXZPoint(e);
 
+      const makePreview = (shape: THREE.Shape, color: number) => {
+        const geo = new THREE.ShapeGeometry(shape);
+        const mat = new THREE.MeshBasicMaterial({ color, wireframe: true });
+        if (previewMesh.current) scene.remove(previewMesh.current);
+        previewMesh.current = new THREE.Mesh(geo, mat);
+        previewMesh.current.position.set(startPoint.current!.x, 0.01, startPoint.current!.z);
+        scene.add(previewMesh.current);
+      };
+
       if (sketchTool === "rectangle") {
         const w = current.x - startPoint.current.x;
         const h = current.z - startPoint.current.z;
@@ -169,22 +200,12 @@ const Canvas3D = forwardRef<
         shape.lineTo(w, h);
         shape.lineTo(0, h);
         shape.lineTo(0, 0);
-        const geo = new THREE.ShapeGeometry(shape);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x22ccff, wireframe: true });
-        if (previewMesh.current) scene.remove(previewMesh.current);
-        previewMesh.current = new THREE.Mesh(geo, mat);
-        previewMesh.current.position.set(startPoint.current.x, 0.01, startPoint.current.z);
-        scene.add(previewMesh.current);
+        makePreview(shape, 0x22ccff);
       } else if (sketchTool === "circle") {
         const radius = startPoint.current.distanceTo(current);
         const shape = new THREE.Shape();
         shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
-        const geo = new THREE.ShapeGeometry(shape);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x44ff88, wireframe: true });
-        if (previewMesh.current) scene.remove(previewMesh.current);
-        previewMesh.current = new THREE.Mesh(geo, mat);
-        previewMesh.current.position.set(startPoint.current.x, 0.01, startPoint.current.z);
-        scene.add(previewMesh.current);
+        makePreview(shape, 0x44ff88);
       }
     };
 
@@ -198,6 +219,8 @@ const Canvas3D = forwardRef<
         previewMesh.current = null;
       }
 
+      let mesh: THREE.Mesh;
+
       if (sketchTool === "rectangle") {
         const width = end.x - startPoint.current.x;
         const height = end.z - startPoint.current.z;
@@ -209,21 +232,21 @@ const Canvas3D = forwardRef<
         shape.lineTo(0, 0);
         const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.5, bevelEnabled: false });
         const material = new THREE.MeshStandardMaterial({ color: 0xff5533 });
-        const mesh = new THREE.Mesh(geometry, material);
+        mesh = new THREE.Mesh(geometry, material);
         mesh.name = `extrude-rectangle`;
-        mesh.position.set(startPoint.current.x, 0, startPoint.current.z);
-        scene.add(mesh);
-      } else if (sketchTool === "circle") {
+      } else {
         const radius = startPoint.current.distanceTo(end);
         const shape = new THREE.Shape();
         shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
         const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.5, bevelEnabled: false });
         const material = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
-        const mesh = new THREE.Mesh(geometry, material);
+        mesh = new THREE.Mesh(geometry, material);
         mesh.name = `extrude-circle`;
-        mesh.position.set(startPoint.current.x, 0, startPoint.current.z);
-        scene.add(mesh);
       }
+
+      mesh.position.set(startPoint.current.x, 0, startPoint.current.z);
+      scene.add(mesh);
+      historyRef.current?.snapshot(); //  record after extrusion
     };
 
     const canvas = renderer.domElement;
@@ -238,34 +261,25 @@ const Canvas3D = forwardRef<
     };
   }, [mode, sketchTool]);
 
-  // ==========================================================
   // Disable OrbitControls and Transform Gizmo during sketch
-  // ==========================================================
   useEffect(() => {
     const transform = transformRef.current;
     if (!transform) return;
 
     if (mode === "sketch") {
-      // Disable camera movement
       transform.orbit.enabled = false;
       transform.orbit.enableZoom = false;
       transform.orbit.enablePan = false;
-
-      // Hide transform gizmo
       (transform.transform as any).visible = false;
-
     } else {
-      // Re-enable controls
       transform.orbit.enabled = true;
       transform.orbit.enableZoom = true;
       transform.orbit.enablePan = true;
-(transform.transform as any).visible = true;
+      (transform.transform as any).visible = true;
     }
   }, [mode]);
 
-  // ==========================================================
   // Keyboard shortcuts for TransformControls
-  // ==========================================================
   useEffect(() => {
     const transform = transformRef.current;
     if (!transform) return;
@@ -281,6 +295,12 @@ const Canvas3D = forwardRef<
           break;
         case "s":
           transform.transform.setMode("scale");
+          break;
+        case "z":
+          if (e.ctrlKey) historyRef.current?.undo();
+          break;
+        case "y":
+          if (e.ctrlKey) historyRef.current?.redo();
           break;
       }
     };
@@ -309,6 +329,7 @@ const Canvas3D = forwardRef<
             color: "white",
             background: "#ff5533",
             padding: "4px 8px",
+            pointerEvents: "none",
           }}
         >
           ✏️ Sketch Mode Active ({sketchTool}) — Camera Locked

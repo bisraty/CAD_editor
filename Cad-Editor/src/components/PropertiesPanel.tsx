@@ -1,51 +1,43 @@
-// src/components/PropertiesPanel.tsx
-import React, { useEffect, useState } from "react";
+import type { SelectionInfo } from "../three/SelectionManager";
 import * as THREE from "three";
 
-interface Props {
-  selected: THREE.Object3D | null;
-}
-
-export const PropertiesPanel: React.FC<Props> = ({ selected }) => {
-  interface ObjectProps {
-    position: THREE.Vector3;
-    rotation: THREE.Euler;
-    scale: THREE.Vector3;
-    type: string;
+export const PropertiesPanel = ({ selected }: { selected: SelectionInfo | null }) => {
+  if (!selected) {
+    return <div style={{ padding: "8px", color: "white" }}>No selection</div>;
   }
 
-  const [props, setProps] = useState<ObjectProps | null>(null);
+  const { type, object, normal, area, length } = selected;
 
-  useEffect(() => {
-    if (!selected) return setProps(null);
-    const update = () => {
-      setProps({
-        position: selected.position.clone(),
-        rotation: selected.rotation.clone(),
-        scale: selected.scale.clone(),
-        type: selected.userData?.type || selected.type,
-      });
-    };
-    update();
+  const vecToString = (v?: THREE.Vector3) =>
+    v ? [v.x, v.y, v.z].map((n) => n.toFixed(2)).join(", ") : "—";
 
-    const interval = setInterval(update, 200);
-    return () => clearInterval(interval);
-  }, [selected]);
-
-  if (!props) return <div style={{ color: "white", padding: "8px" }}>No selection</div>;
+  const eulerToString = (e?: THREE.Euler) =>
+    e ? [e.x, e.y, e.z].map((n) => n.toFixed(2)).join(", ") : "—";
 
   return (
     <div style={{ padding: "8px", color: "white" }}>
-      <h3>{props.type}</h3>
-      <p>
-        <b>Position:</b> {props.position.x.toFixed(2)}, {props.position.y.toFixed(2)}, {props.position.z.toFixed(2)}
-      </p>
-      <p>
-        <b>Rotation:</b> {props.rotation.x.toFixed(2)}, {props.rotation.y.toFixed(2)}, {props.rotation.z.toFixed(2)}
-      </p>
-      <p>
-        <b>Scale:</b> {props.scale.x.toFixed(2)}, {props.scale.y.toFixed(2)}, {props.scale.z.toFixed(2)}
-      </p>
+      <h3>Selection: {type}</h3>
+
+      {type === "shape" && object && (
+        <>
+          <p><b>Position:</b> {vecToString(object.position)}</p>
+          <p><b>Rotation:</b> {eulerToString(object.rotation)}</p>
+          <p><b>Scale:</b> {vecToString(object.scale)}</p>
+        </>
+      )}
+
+      {type === "face" && normal && area !== undefined && (
+        <>
+          <p><b>Normal:</b> {vecToString(normal)}</p>
+          <p><b>Area:</b> {area.toFixed(4)}</p>
+        </>
+      )}
+
+      {type === "edge" && length !== undefined && (
+        <>
+          <p><b>Length:</b> {length.toFixed(4)}</p>
+        </>
+      )}
     </div>
   );
 };

@@ -24,6 +24,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({ onExport, onImport }) => {
         padding: "8px",
         background: "#333",
         color: "white",
+        alignItems: "center",
       }}
     >
       <button onClick={onExport}>Export</button>

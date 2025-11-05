@@ -7,7 +7,7 @@ Supports 3D primitive creation, 2D sketching + extrusion, entity selection, tran
 
 ## 🚀 Live Demo
 
-**Deployed URL:** https://cad-editor-eta.vercel.app/ 
+**Deployed URL:** https://beamish-meerkat-fd3dd1.netlify.app/ 
 
 ---
 

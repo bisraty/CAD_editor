@@ -13,7 +13,7 @@ import { SelectionManager } from "../three/SelectionManager";
 import { TransformManager } from "../three/TransformManager";
 import { addGridHelper, snapToGrid } from "../three/utils";
 import { IOManager } from "../three/IOManager";
-import { HistoryManager } from "../three/HistoryManager"; //  added
+import { HistoryManager } from "../three/HistoryManager"; 
 
 export interface Canvas3DRef {
   addShape: (type: PrimitiveType) => void;
@@ -22,6 +22,7 @@ export interface Canvas3DRef {
   importScene: (json: string) => void;
   undo: () => void;
   redo: () => void;
+  clearScene: () => void;
 }
 
 const Canvas3D = forwardRef<
@@ -143,7 +144,21 @@ const Canvas3D = forwardRef<
         historyRef.current?.snapshot();
       }
     },
+clearScene: () => {  
+    const mgr = managerRef.current;
+    if (!mgr) return;
 
+    const scene = mgr.scene;
+    // Keep only grid helpers and lights
+    const keep = ["GridHelper", "HemisphereLight", "DirectionalLight"];
+    scene.children = scene.children.filter(obj => keep.includes(obj.type));
+
+    // Reset selection and transforms
+    selectionRef.current?.clearHighlight();
+    transformRef.current?.detach();
+
+    shapeCounter.current = 0;
+  },
     //  Undo/Redo bindings
     undo: () => historyRef.current?.undo(),
     redo: () => historyRef.current?.redo(),
